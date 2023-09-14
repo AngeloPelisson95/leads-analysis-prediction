@@ -1,0 +1,42 @@
+attribute, description
+cod_anuncio,código do anúncio
+cod_cliente,código do anunciante
+cod_tipo_pessoa,"tipo de anunciante: PF=1, PJ=2"
+prioridade,"prioridade do anúncio (1=alta, 2-média, 3-baixa)"
+leads,tota de propostas recebidas
+views,quantidade de visualizações no anúncio
+cliques_telefone,quantidade de cliques no telefone anunciado
+cod_marca_veiculo,código da marca do veículo
+cod_modelo_veiculo,código do modelo veículo
+cod_versao_veiculo,código da versão do veículo
+ano_modelo,ano-modelo do veículo
+cep_2dig,dois primeiros dígitos do cep do anunciante
+uf_cidade,UF e cidade do anunciante
+vlr_anuncio,valor do veículo no anúncio
+qtd_fotos,quantidade de fotos no anúncio
+km_veiculo,Kilometragem do veículo
+vlr_mercado,valor de referência do veículo na praça
+flg_unico_dono,indicador de único dono
+flg_licenciado,indicador de licenciamento em dia
+flg_ipva_pago,indicador de IPVA em dia
+flg_todas_revisoes_concessionaria,indicador realização de todas as revisões na concessionária
+flg_todas_revisoes_agenda_veiculo,indicador realização de todas as revisões previstas na agenda do veículo
+flg_garantia_fabrica,indicador de veículo em garantia de fábrica
+flg_blindado,indicador de blindagem
+flg_aceita_troca,indicador de que o anunciante aceita troca
+flg_adaptado_pcd,indicador de veículo adaptado para pessoa com deficiência
+combustivel,especificação de combustível
+cambio,especificação de câmbio
+portas,número de portas
+alarme,presença de alarme
+airbag,presença de airbag
+arquente,presença de ar quente
+bancocouro,presença de banco de couro
+arcondic,presença de ar condicionado
+abs,presença de freio abs
+desembtras,presença de desembaçador traseiro
+travaeletr,presença de travas elétricas
+vidroseletr,presença de vidros elétricos
+rodasliga,presença de rodas de liga-leve
+sensorchuva,presença de sensor de chuva
+sensorestacion,presença de sensor de estacionamento
