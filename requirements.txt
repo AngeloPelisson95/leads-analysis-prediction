@@ -1,6 +1,7 @@
 # Data manipulation and analysis
 pandas>=1.5.0
 numpy>=1.21.0
+pandas-stubs>=1.2.0
 
 # Machine learning
 scikit-learn>=1.1.0
