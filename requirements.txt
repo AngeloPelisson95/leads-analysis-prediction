@@ -4,9 +4,10 @@ numpy>=1.21.0
 pandas-stubs>=1.2.0
 
 # Machine learning
-scikit-learn>=1.1.0
-xgboost>=1.6.0
-lightgbm>=3.3.0
+scikit-learn
+xgboost
+lightgbm
+
 
 # Data visualization
 matplotlib>=3.5.0
@@ -21,7 +22,7 @@ nbformat>=5.0.0
 # Statistical analysis
 scipy>=1.8.0
 statsmodels>=0.13.0
-jenkspy>=1.0.0
+jenkspy
 
 # Data validation
 great-expectations>=0.15.0

@@ -4,8 +4,6 @@ Feature engineering utilities.
 
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler, LabelEncoder, TargetEncoder
-from sklearn.feature_selection import SelectKBest, f_classif
 from jenkspy import JenksNaturalBreaks
 import pickle
 import os
@@ -19,18 +17,11 @@ class FeatureEngineering:
     """Feature engineering pipeline."""
 
     def __init__(self, data: pd.DataFrame, target_col: str, flag_cols: list = []):
-        self.scaler = StandardScaler()
         self.target_col = target_col
         self.flag_cols = flag_cols
-        self.feature_selector = None
-        self.is_scaler_fitted = False
-        self.fitted_numeric_columns = None
         self.data = data
 
-    
-    def create_flag_clustering_features(
-        self
-    ) -> pd.DataFrame:
+    def create_flag_clustering_features(self) -> pd.DataFrame:
         """
         Create clustering features based on flag variables combinations.
 
@@ -66,7 +57,7 @@ class FeatureEngineering:
         data_enhanced["sum_flags"] = data_enhanced[feature_flag_cols].sum(axis=1)
 
         grouped = (
-            data.groupby(feature_flag_cols)
+            data_enhanced.groupby(feature_flag_cols)
             .agg(
                 n_ads=(self.target_col, "count"),
                 mean_leads=(self.target_col, "mean"),
@@ -98,6 +89,8 @@ class FeatureEngineering:
         logger.info("Flag clustering features created successfully")
         return self.final_group
 
+    
+
 class FlagClusteringTransformer(BaseEstimator, TransformerMixin):
     """
     Production-ready transformer for flag clustering features.
@@ -106,7 +99,7 @@ class FlagClusteringTransformer(BaseEstimator, TransformerMixin):
     new data in production without needing access to historical data.
     """
 
-    def __init__(self, n_clusters=5, target_col="leads", feature_flag_cols=[]):
+    def __init__(self, n_clusters=5, target_col="leads", feature_flag_cols = None):
         """
         Initialize the transformer.
 
@@ -122,7 +115,7 @@ class FlagClusteringTransformer(BaseEstimator, TransformerMixin):
         self.cluster_mapping = None
         self.breaks_ = None
         self.is_fitted = False
-        self.feature_engineering = FeatureEngineering()
+       
 
     def fit(self, X, y=None):
         """
@@ -135,12 +128,11 @@ class FlagClusteringTransformer(BaseEstimator, TransformerMixin):
         Returns:
             self: Returns self for method chaining
         """
+        self.feature_engineering = FeatureEngineering(X, self.target_col, self.feature_flag_cols)
         logger.info("Fitting FlagClusteringTransformer...")
         logger.info(f"Using flag columns: {self.feature_flag_cols}")
 
-        self.final_group = self.feature_engineering.create_flag_clustering_features(
-            X, target_col=self.target_col, flag_cols=self.feature_flag_cols
-        )
+        self.final_group = self.feature_engineering.create_flag_clustering_features()        
         # Fit Jenks Natural Breaks if we have enough data points
         if len(self.final_group) > 1:
             try:
@@ -219,7 +211,7 @@ class FlagClusteringTransformer(BaseEstimator, TransformerMixin):
         if len(available_flag_cols) == 0:
             logger.warning("None of the fitted flag columns found in new data")
             return X_transformed
-
+        logger.info(f"Using {len(available_flag_cols)} available flag columns: {available_flag_cols}")
         X_transformed["sum_flags"] = X_transformed[available_flag_cols].sum(axis=1)
 
         # Apply cluster mapping
@@ -230,7 +222,12 @@ class FlagClusteringTransformer(BaseEstimator, TransformerMixin):
         else:
             X_transformed["flag_cluster"] = 0
 
-        logger.info(f"Transformed data with {len(available_flag_cols)} flag columns")
+        cols_to_drop = available_flag_cols + ["sum_flags"]
+        logger.info(f"Dropping columns: {cols_to_drop}")
+        # Drop original flag columns and sum_flags
+        X_transformed = X_transformed.drop(columns=cols_to_drop)  # Remove colunas listadas em cols_to_drop
+        logger.info("Dropped original flag columns and sum_flags")
+        logger.info(f"Transformed data with {len(cols_to_drop)} flag columns")
         return X_transformed
 
     def fit_transform(self, X, y=None):
@@ -246,72 +243,8 @@ class FlagClusteringTransformer(BaseEstimator, TransformerMixin):
         """
         return self.fit(X, y).transform(X)
 
-    def save(self, filepath):
-        """
-        Save the fitted transformer to disk.
-        
-        Args:
-            filepath (str): Path to save the transformer
-        """
-        if not self.is_fitted:
-            raise ValueError("Cannot save unfitted transformer")
-        
-        transformer_data = {
-            'feature_flag_cols': self.feature_flag_cols,
-            'cluster_mapping': self.cluster_mapping,
-            'breaks_': self.breaks_,
-            'n_clusters': self.n_clusters,
-            'target_col': self.target_col,
-            'is_fitted': self.is_fitted
-        }
-        
-        # Save jenks model separately if it exists
-        if self.jenks_model is not None:
-            transformer_data['jenks_labels'] = self.jenks_model.labels_
-            transformer_data['jenks_groups'] = self.jenks_model.groups_
-            
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        with open(filepath, 'wb') as f:
-            pickle.dump(transformer_data, f)
-            
-        logger.info(f"FlagClusteringTransformer saved to {filepath}")
-    
-    @classmethod
-    def load(cls, filepath):
-        """
-        Load a fitted transformer from disk.
-        
-        Args:
-            filepath (str): Path to load the transformer from
-            
-        Returns:
-            FlagClusteringTransformer: Loaded transformer
-        """
-        with open(filepath, 'rb') as f:
-            transformer_data = pickle.load(f)
-        
-        transformer = cls(
-            n_clusters=transformer_data['n_clusters'],
-            target_col=transformer_data['target_col'],
-            feature_flag_cols=transformer_data['feature_flag_cols']
-        )
-        
-        transformer.cluster_mapping = transformer_data['cluster_mapping']
-        transformer.breaks_ = transformer_data['breaks_']
-        transformer.is_fitted = transformer_data['is_fitted']
-        
-        # Reconstruct jenks model if data exists
-        if 'jenks_labels' in transformer_data:
-            transformer.jenks_model = JenksNaturalBreaks(transformer_data['n_clusters'])
-            transformer.jenks_model.labels_ = transformer_data['jenks_labels']
-            transformer.jenks_model.groups_ = transformer_data['jenks_groups']
-            transformer.jenks_model.breaks_ = transformer_data['breaks_']
-        
-        logger.info(f"FlagClusteringTransformer loaded from {filepath}")
-        return transformer
 
-
-class ComprehensiveFeatureTransformer(BaseEstimator, TransformerMixin):
+class PreprocessingFeatures:
     """
     A comprehensive feature transformer that includes:
     - Missing value handling
@@ -319,221 +252,280 @@ class ComprehensiveFeatureTransformer(BaseEstimator, TransformerMixin):
     - Categorical encoding (label and target encoding)
     - Flag clustering features
     """
-    
-    def __init__(self, 
-                 numeric_columns=None,
-                 categorical_columns=None,
-                 target_encode_columns=None,
-                 flag_columns=None,
-                 missing_strategy='mean',
-                 n_flag_clusters=5,
-                 target_col='leads'):
+
+    def __init__(
+        self,
+        data: pd.DataFrame,
+        location_col=None,
+        fuel_type_column=None,
+        cols_to_drop=None,
+        outlier_columns=None,
+    ):
         """
         Initialize the comprehensive transformer.
-        
+
         Args:
-            numeric_columns (list): Columns to scale
-            categorical_columns (list): Columns to label encode
-            target_encode_columns (list): Columns to target encode
+            numeric_columns (list): columns to scale
+            categorical_columns (list): columns to label encode
+            target_encode_columns (list): columns to target encode
             flag_columns (list): Flag columns for clustering
             missing_strategy (str): Strategy for missing values
             n_flag_clusters (int): Number of clusters for flag clustering
             target_col (str): Target column name
         """
-        self.numeric_columns = numeric_columns
-        self.categorical_columns = categorical_columns
-        self.target_encode_columns = target_encode_columns
-        self.flag_columns = flag_columns
-        self.missing_strategy = missing_strategy
-        self.n_flag_clusters = n_flag_clusters
-        self.target_col = target_col
+        self.data = data
+        self.location_col = location_col
+        self.fuel_type_column = fuel_type_column
+        self.cols_to_drop = cols_to_drop
+        self.outlier_columns = outlier_columns 
+
+    def _columns_type(self):
+        self.cat_cols = []
+        self.num_cols = []
+
+        for col in self.data.columns:
+            if any(prefix in col for prefix in ['cd_', 'zip_', 'year_', 'flg_', 'type', 'city', 'state']):
+                self.cat_cols.append(col)
+            else:
+                self.num_cols.append(col)
+
+        # Add priority, n_doors, and n_photos to categorical if they exist
+        for col in ['priority', 'n_doors', 'n_photos']:
+            if col in self.data.columns and col not in self.cat_cols:
+                self.cat_cols.append(col)
+                if col in self.num_cols:
+                    self.num_cols.remove(col)
+
+        # Removing Target Variable from features
+        self.cat_cols.remove('flg_leads') if 'flg_leads' in self.cat_cols else None
+        self.num_cols.remove('leads') if 'leads' in self.num_cols else None
+        target_cols = ['flg_leads', 'leads']
         
-        # Initialize components
-        self.feature_engineering = FeatureEngineering()
-        self.flag_transformer = None
-        self.is_fitted = False
-        
-    def fit(self, X, y=None):
+        logger.info(f"📈 Numerical features: {len(self.num_cols)}")
+        logger.info(f"🏷️ Categorical features: {len(self.cat_cols)}")
+        logger.info(f"🎯 Target variable: {target_cols}")
+
+    def _location_split(self):
         """
-        Fit all transformers.
-        
+        Create separated columns for location data state and city.
+
         Args:
-            X (pd.DataFrame): Training data
-            y (pd.Series): Target variable
-            
+            location_col (str): Column name containing location data.
+            Ex: "STATE_CITY"
+
         Returns:
-            self: Returns self for method chaining
+
         """
-        logger.info("Fitting ComprehensiveFeatureTransformer...")
-        
-        X_processed = X.copy()
-        
-        # 1. Handle missing values
-        X_processed = self.feature_engineering.handle_missing_values(X_processed, self.missing_strategy)
-        
-        # 2. Target encoding (requires target variable)
-        if self.target_encode_columns and y is not None:
-            X_processed = self.feature_engineering.target_encode_categorical_variables(
-                X_processed, y, self.target_encode_columns
-            )
-        
-        # 3. Label encoding
-        if self.categorical_columns:
-            X_processed = self.feature_engineering.encode_categorical_variables(
-                X_processed, self.categorical_columns
-            )
-        
-        # 4. Scaling
-        if self.numeric_columns:
-            # Add target encoded columns to numeric columns if they exist
-            extended_numeric = self.numeric_columns.copy() if self.numeric_columns else []
-            if self.target_encode_columns:
-                extended_numeric.extend([f'{col}_target_encoded' for col in self.target_encode_columns 
-                                       if f'{col}_target_encoded' in X_processed.columns])
-            
-            X_processed = self.feature_engineering.scale_features(X_processed, extended_numeric, fit=True)
-        
-        # 5. Flag clustering
-        if self.flag_columns:
-            self.flag_transformer = FlagClusteringTransformer(
-                n_clusters=self.n_flag_clusters,
-                target_col=self.target_col,
-                feature_flag_cols=self.flag_columns
-            )
-            X_processed = self.flag_transformer.fit_transform(X_processed)
-        
-        self.is_fitted = True
-        logger.info("ComprehensiveFeatureTransformer fitted successfully")
+
+        logger.info("Runnig location split...")
+
+        # Creating a new column 'city' and 'state' from 'city_state'
+        for _, row in self.data.iterrows():
+            str_cs = row[self.location_col]
+            cs_ = str_cs.split("_")
+            self.data.at[_, self.location_col] = str_cs
+            self.data.at[_, "city"] = cs_[1].strip()
+            self.data.at[_, "state"] = cs_[0].strip()
+
+        # Drop the original 'city_state' column
+        self.data.drop(columns=["city_state"], inplace=True)
+
+        # Function to fix encoding issues in text columns
+        def fix_encoding(text):
+            if isinstance(text, str):
+                try:
+                    return text.encode("latin1", errors="replace").decode(
+                        "utf-8", errors="replace"
+                    )
+                except:
+                    return text
+            return text
+
+        self.data["city"] = self.data["city"].apply(fix_encoding)
+
         return self
-    
-    def transform(self, X):
-        """
-        Transform new data using fitted transformers.
-        
+
+    def _flag_to_int(self):
+        """Convert flag columns to integer type."""
+        logger.info("Converting flag columns to integer type...")
+        for col in self.data.columns:
+            if col.startswith("flg_"):
+                self.data[col] = self.data[col].fillna(0)
+                self.data[col] = (
+                    self.data[col]
+                    .replace({"S": "Y"})
+                    .replace({"Y": 1, "N": 0})
+                    .astype(int)
+                )
+
+        logger.info("Flag columns converted to integer type successfully")
+        return self
+
+    def _fuel_type_to_flag(self):
+        """Convert fuel type column to flag columns.
         Args:
-            X (pd.DataFrame): Data to transform
-            
+            fuel_type_col (str): Column name containing fuel type data.
         Returns:
-            pd.DataFrame: Transformed data
+            pd.DataFrame: DataFrame with new flag columns for each fuel type.
         """
-        if not self.is_fitted:
-            raise ValueError("Transformer must be fitted before transform")
-        
-        X_processed = X.copy()
-        
-        # 1. Handle missing values (using same strategy)
-        X_processed = self.feature_engineering.handle_missing_values(X_processed, self.missing_strategy)
-        
-        # 2. Target encoding (using fitted encoders)
-        if self.target_encode_columns:
-            for col in self.target_encode_columns:
-                if col in self.feature_engineering.target_encoders and col in X_processed.columns:
-                    X_processed[f'{col}_target_encoded'] = self.feature_engineering.target_encoders[col].transform(
-                        X_processed[[col]]
-                    ).ravel()
-        
-        # 3. Label encoding (using fitted encoders)
-        if self.categorical_columns:
-            for col in self.categorical_columns:
-                if col in self.feature_engineering.label_encoders and col in X_processed.columns:
-                    # Handle unseen categories
-                    try:
-                        X_processed[col] = self.feature_engineering.label_encoders[col].transform(X_processed[col])
-                    except ValueError:
-                        # Handle unseen categories by setting them to a default value
-                        logger.warning(f"Unseen categories found in {col}, setting to 0")
-                        known_categories = set(self.feature_engineering.label_encoders[col].classes_)
-                        X_processed[col] = X_processed[col].apply(
-                            lambda x: x if x in known_categories else self.feature_engineering.label_encoders[col].classes_[0]
-                        )
-                        X_processed[col] = self.feature_engineering.label_encoders[col].transform(X_processed[col])
-        
-        # 4. Scaling (using fitted scaler)
-        if self.numeric_columns and self.feature_engineering.is_scaler_fitted:
-            # Include target encoded columns
-            extended_numeric = self.numeric_columns.copy() if self.numeric_columns else []
-            if self.target_encode_columns:
-                extended_numeric.extend([f'{col}_target_encoded' for col in self.target_encode_columns 
-                                       if f'{col}_target_encoded' in X_processed.columns])
-            
-            X_processed = self.feature_engineering.scale_features(X_processed, extended_numeric, fit=False)
-        
-        # 5. Flag clustering (using fitted transformer)
-        if self.flag_transformer:
-            X_processed = self.flag_transformer.transform(X_processed)
-        
-        logger.info("Data transformed successfully")
-        return X_processed
+        logger.info("Converting fuel type to flag columns...")
+
+        fuel_types = []
+        for item in self.data[self.fuel_type_column].unique():
+            if isinstance(item, str):  # check if item is a string
+                # Split the string by spaces and commas, and strip any whitespace
+                str_lst = item.split(" ")
+                for i in range(len(str_lst)):
+                    str_lst[i] = str_lst[i].strip().replace(",", "")  # remove commas
+                    if str_lst[i] != "e":  # check if the item is not 'e'
+                        if (
+                            str_lst[i] not in fuel_types
+                        ):  # check if the item is not already in the list
+                            fuel_types.append(str_lst[i])
+
+        logger.info(f"Found {len(fuel_types)} unique fuel types: {fuel_types}")
+
+        fuel_types.remove("natural")
+        fuel_types.remove("gas")
+        fuel_types.append("gas natural")
+
+        self.data["fuel_type"] = self.data["fuel_type"].fillna(
+            ""
+        )  # Fill NaN values with empty string to avoid errors
+
+        # Third, we need to create a new column for each fuel type
+        for fuel in fuel_types:
+            self.data[f"flg_{fuel.replace(" ", "_")}"] = self.data["fuel_type"].apply(
+                lambda x: 1 if fuel in x else 0 if x == "" else 0
+            )
+
+        # Now we can drop the original fuel_type column
+        self.data.drop(columns=[self.fuel_type_column], inplace=True)
+
+        return self
+
+    def _remove_duplicated(self):
+        """Remove duplicate columns from the DataFrame."""
+        logger.info("Removing duplicate columns...")
+        # Identify duplicate columns
+        duplicate_columns = self.data.columns[self.data.columns.duplicated()].tolist()
+        if duplicate_columns:
+            logger.warning(f"Found duplicate columns: {duplicate_columns}")
+            # Remove duplicate columns, keeping the first occurrence
+            self.data = self.data.loc[:, ~self.data.columns.duplicated()]
+            logger.info("Duplicate columns removed successfully")
+        else:
+            logger.info("No duplicate columns found")
+
+        self.data = self.data.drop_duplicates().reset_index(drop=True)
+
+        return self
+
+    def _clean_spurious_values(self):
+        """Clean spurious values in the DataFrame."""
+        logger.info("Cleaning spurious values...")
+        rows_with_minus_one = (self.data == -1).any(axis=1).sum()
+        if rows_with_minus_one > 0:
+            logger.warning(
+                f"Found {rows_with_minus_one} rows with -1 values, removing them"
+            )
+        else:
+            logger.info("No spurious -1 values found")
+        self.data = self.data[~(self.data == -1).any(axis=1)].reset_index(drop=True)
+
+        return self
+
+    def _remove_outliers_iqr(
+        self, lower_percentile=0.01, upper_percentile=0.99, k=3
+    ):
+        """Remove outliers using percentile-based approach"""
+
+        columns = self.outlier_columns
+        self.lower_percentile = lower_percentile
+        self.upper_percentile = upper_percentile
+        self.k = k
+
+        for col in columns:
+            q1 = self.data[col].quantile(self.lower_percentile)
+            q3 = self.data[col].quantile(self.upper_percentile)
+            iqr = q3 - q1
+            lower = q1 - k * iqr
+            upper = q3 + k * iqr
+            outliers_low = (self.data[col] < lower).sum()
+            outliers_high = (self.data[col] > upper).sum()
+            total_outliers = outliers_low + outliers_high
+
+            logger.info(f"{col}:")
+            logger.info(
+                f"  - Lower bound ({self.lower_percentile:.1%}): {lower:.2f} ({outliers_low} outliers)"
+            )
+            logger.info(
+                f"  - Upper bound ({self.upper_percentile:.1%}): {upper:.2f} ({outliers_high} outliers)"
+            )
+            logger.info(
+                f"  - Total outliers: {total_outliers} ({total_outliers/len(self.data)*100:.2f}%)"
+            )
+
+            self.data = self.data[(self.data[col] >= lower) & (self.data[col] <= upper)]
+            logger.info(f"  - Rows removed: {len(self.data) - len(self.data)}n")
+
+        return self
+
+    def _feature_setup(self):
+
+        """Setup features for the transformer."""
+        logger.info("Setting up features...")
+
+        # Handle missing values
+        self.processed_data = self.data.copy()
+        self.input_data = self.processed_data.drop(columns = self.cols_to_drop)
+        self.input_columns = self.input_data.columns.tolist()
+        self.data = self.input_data.copy()
+        logger.info("Feature setup completed successfully")
+        return self
+
+
+class PreprocessingFeaturesTransformer(BaseEstimator, TransformerMixin):
+    def __init__(self, location_col, fuel_type_column, cols_to_drop, outlier_columns):
+        self.location_col = location_col
+        self.fuel_type_column = fuel_type_column
+        self.cols_to_drop = cols_to_drop
+        self.outlier_columns = outlier_columns
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        data = X.copy()
+        self.pre = PreprocessingFeatures(
+            data=data,
+            location_col=self.location_col,
+            fuel_type_column=self.fuel_type_column,
+            cols_to_drop=self.cols_to_drop,
+            outlier_columns=self.outlier_columns
+        )
+
+        self.pre._columns_type()
+        self.pre._location_split()
+        self.pre._flag_to_int()
+        self.pre._fuel_type_to_flag()
+        self.pre._remove_duplicated()
+        self.pre._clean_spurious_values()
+        self.pre._remove_outliers_iqr()
+        self.pre._feature_setup()
+
+
+        return self.pre.data
     
     def fit_transform(self, X, y=None):
         """
-        Fit and transform in one step.
-        
+        Fit the transformer and transform the data in one step.
+
         Args:
             X (pd.DataFrame): Training data
-            y (pd.Series): Target variable
-            
+            y: Not used, present for sklearn compatibility
+
         Returns:
             pd.DataFrame: Transformed training data
         """
         return self.fit(X, y).transform(X)
-    
-    def save(self, filepath):
-        """
-        Save the entire transformer.
-        
-        Args:
-            filepath (str): Path to save the transformer
-        """
-        if not self.is_fitted:
-            raise ValueError("Cannot save unfitted transformer")
-        
-        transformer_data = {
-            'numeric_columns': self.numeric_columns,
-            'categorical_columns': self.categorical_columns,
-            'target_encode_columns': self.target_encode_columns,
-            'flag_columns': self.flag_columns,
-            'missing_strategy': self.missing_strategy,
-            'n_flag_clusters': self.n_flag_clusters,
-            'target_col': self.target_col,
-            'feature_engineering': self.feature_engineering,
-            'flag_transformer': self.flag_transformer,
-            'is_fitted': self.is_fitted
-        }
-        
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        with open(filepath, 'wb') as f:
-            pickle.dump(transformer_data, f)
-            
-        logger.info(f"ComprehensiveFeatureTransformer saved to {filepath}")
-    
-    @classmethod
-    def load(cls, filepath):
-        """
-        Load a fitted transformer.
-        
-        Args:
-            filepath (str): Path to load the transformer from
-            
-        Returns:
-            ComprehensiveFeatureTransformer: Loaded transformer
-        """
-        with open(filepath, 'rb') as f:
-            transformer_data = pickle.load(f)
-        
-        transformer = cls(
-            numeric_columns=transformer_data['numeric_columns'],
-            categorical_columns=transformer_data['categorical_columns'],
-            target_encode_columns=transformer_data['target_encode_columns'],
-            flag_columns=transformer_data['flag_columns'],
-            missing_strategy=transformer_data['missing_strategy'],
-            n_flag_clusters=transformer_data['n_flag_clusters'],
-            target_col=transformer_data['target_col']
-        )
-        
-        transformer.feature_engineering = transformer_data['feature_engineering']
-        transformer.flag_transformer = transformer_data['flag_transformer']
-        transformer.is_fitted = transformer_data['is_fitted']
-        
-        logger.info(f"ComprehensiveFeatureTransformer loaded from {filepath}")
-        return transformer
