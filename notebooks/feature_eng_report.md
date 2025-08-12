@@ -57,23 +57,6 @@ This module provides utilities for feature engineering in a machine learning pip
 - **Sklearn Compatibility:** `FlagClusteringTransformer` inherits from `BaseEstimator` and `TransformerMixin` for seamless integration with scikit-learn pipelines.
 - **Robustness:** Handles edge cases such as missing values, unseen flag combinations, and duplicate columns.
 
----
-
-## Example Usage
-```python
-from src.features.feature_engineering import FlagClusteringTransformer
-from sklearn.pipeline import Pipeline
-
-pipeline = Pipeline([
-    ('flag_clustering', FlagClusteringTransformer(n_clusters=5)),
-    # ... other steps ...
-])
-
-pipeline.fit(X_train, y_train)
-predictions = pipeline.predict(X_test)
-```
-
----
 
 ## Summary
 - The module provides a robust, production-ready set of tools for feature engineering, especially for datasets with many binary flag features.
@@ -82,4 +65,3 @@ predictions = pipeline.predict(X_test)
 
 ---
 
-### Feature Engineering (`feature_engineering/`)
