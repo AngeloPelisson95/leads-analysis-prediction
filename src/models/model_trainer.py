@@ -41,30 +41,30 @@ class LeadsPredictionTrainer:
 
         # Features to drop (based on analysis)
         self.feat_to_drop = [
-            "cd_type_individual",
-            "cd_advertise",
-            "cd_client",
-            "flg_rain_sensor",
-            "flg_diesel",
-            "flg_eletrico",
-            "flg_benzina",
-            "flg_pcd",
-            "flg_trade_in",
-            "flg_armored",
-            "flg_factory_warranty",
-            "flg_all_dealership_schedule_vehicle",
-            "flg_all_dealership_services",
-            "flg_single_owner",
-            "priority",
-            "cd_model_vehicle",
-            "cd_version_vehicle",
-            "flg_lincese",
-            "flg_tax_paid",
-            "n_doors",
-            "flg_alloy_wheels",
-            "flg_gas_natural",
+            "cd_type_individual",                   # Individual type code - low predictive power
+            "cd_advertise",                         # Advertisement code - redundant identifier
+            "cd_client",                            # Client code - privacy/data leakage concern
+            "flg_rain_sensor",                      # Rain sensor flag - low importance
+            "flg_diesel",                           # Diesel fuel flag - redundant with fuel_type
+            "flg_eletrico",                         # Electric flag - rare/insufficient data
+            "flg_benzina",                          # Benzina fuel flag - redundant with fuel_type
+            "flg_pcd",                              # PCD flag - insufficient data
+            "flg_trade_in",                         # Trade-in flag - low importance
+            "flg_armored",                          # Armored vehicle flag - rare cases
+            "flg_factory_warranty",                 # Factory warranty flag - low importance
+            "flg_all_dealership_schedule_vehicle",  # Dealership schedule flag - low importance
+            "flg_all_dealership_services",          # Dealership services flag - low importance
+            "flg_single_owner",                     # Single owner flag - covered by 'owner' column
+            "priority",                             # Priority field - business logic, not predictive
+            "cd_model_vehicle",                     # Vehicle model code - too granular
+            "cd_version_vehicle",                   # Vehicle version code - too granular
+            "flg_lincese",                          # License flag - data quality issues
+            "flg_tax_paid",                         # Tax paid flag - low importance
+            "n_doors",                              # Number of doors - low importance
+            "flg_alloy_wheels",                     # Alloy wheels flag - low importance
+            "flg_gas_natural",                      # Natural gas flag - rare cases
         ]
-
+    
     def create_pipeline(self):
         """Create the complete ML pipeline."""
         self.pipeline = Pipeline(
