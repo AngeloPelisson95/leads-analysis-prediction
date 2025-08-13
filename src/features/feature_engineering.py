@@ -89,7 +89,6 @@ class FeatureEngineering:
         logger.info("Flag clustering features created successfully")
         return self.final_group
 
-    
 
 class FlagClusteringTransformer(BaseEstimator, TransformerMixin):
     """
@@ -99,7 +98,7 @@ class FlagClusteringTransformer(BaseEstimator, TransformerMixin):
     new data in production without needing access to historical data.
     """
 
-    def __init__(self, n_clusters=5, target_col="leads", feature_flag_cols = None):
+    def __init__(self, n_clusters=5, target_col="leads", feature_flag_cols=None):
         """
         Initialize the transformer.
 
@@ -115,7 +114,6 @@ class FlagClusteringTransformer(BaseEstimator, TransformerMixin):
         self.cluster_mapping = None
         self.breaks_ = None
         self.is_fitted = False
-       
 
     def fit(self, X, y=None):
         """
@@ -128,11 +126,13 @@ class FlagClusteringTransformer(BaseEstimator, TransformerMixin):
         Returns:
             self: Returns self for method chaining
         """
-        self.feature_engineering = FeatureEngineering(X, self.target_col, self.feature_flag_cols)
+        self.feature_engineering = FeatureEngineering(
+            X, self.target_col, self.feature_flag_cols
+        )
         logger.info("Fitting FlagClusteringTransformer...")
         logger.info(f"Using flag columns: {self.feature_flag_cols}")
 
-        self.final_group = self.feature_engineering.create_flag_clustering_features()        
+        self.final_group = self.feature_engineering.create_flag_clustering_features()
         # Fit Jenks Natural Breaks if we have enough data points
         if len(self.final_group) > 1:
             try:
@@ -211,7 +211,9 @@ class FlagClusteringTransformer(BaseEstimator, TransformerMixin):
         if len(available_flag_cols) == 0:
             logger.warning("None of the fitted flag columns found in new data")
             return X_transformed
-        logger.info(f"Using {len(available_flag_cols)} available flag columns: {available_flag_cols}")
+        logger.info(
+            f"Using {len(available_flag_cols)} available flag columns: {available_flag_cols}"
+        )
         X_transformed["sum_flags"] = X_transformed[available_flag_cols].sum(axis=1)
 
         # Apply cluster mapping
@@ -225,7 +227,9 @@ class FlagClusteringTransformer(BaseEstimator, TransformerMixin):
         cols_to_drop = available_flag_cols + ["sum_flags"]
         logger.info(f"Dropping columns: {cols_to_drop}")
         # Drop original flag columns and sum_flags
-        X_transformed = X_transformed.drop(columns=cols_to_drop)  # Remove colunas listadas em cols_to_drop
+        X_transformed = X_transformed.drop(
+            columns=cols_to_drop
+        )  # Remove colunas listadas em cols_to_drop
         logger.info("Dropped original flag columns and sum_flags")
         logger.info(f"Transformed data with {len(cols_to_drop)} flag columns")
         return X_transformed
@@ -277,30 +281,33 @@ class PreprocessingFeatures:
         self.location_col = location_col
         self.fuel_type_column = fuel_type_column
         self.cols_to_drop = cols_to_drop
-        self.outlier_columns = outlier_columns 
+        self.outlier_columns = outlier_columns
 
     def _columns_type(self):
         self.cat_cols = []
         self.num_cols = []
 
         for col in self.data.columns:
-            if any(prefix in col for prefix in ['cd_', 'zip_', 'year_', 'flg_', 'type', 'city', 'state']):
+            if any(
+                prefix in col
+                for prefix in ["cd_", "zip_", "year_", "flg_", "type", "city", "state"]
+            ):
                 self.cat_cols.append(col)
             else:
                 self.num_cols.append(col)
 
         # Add priority, n_doors, and n_photos to categorical if they exist
-        for col in ['priority', 'n_doors', 'n_photos']:
+        for col in ["priority", "n_doors", "n_photos"]:
             if col in self.data.columns and col not in self.cat_cols:
                 self.cat_cols.append(col)
                 if col in self.num_cols:
                     self.num_cols.remove(col)
 
         # Removing Target Variable from features
-        self.cat_cols.remove('flg_leads') if 'flg_leads' in self.cat_cols else None
-        self.num_cols.remove('leads') if 'leads' in self.num_cols else None
-        target_cols = ['flg_leads', 'leads']
-        
+        self.cat_cols.remove("flg_leads") if "flg_leads" in self.cat_cols else None
+        self.num_cols.remove("leads") if "leads" in self.num_cols else None
+        target_cols = ["flg_leads", "leads"]
+
         logger.info(f"📈 Numerical features: {len(self.num_cols)}")
         logger.info(f"🏷️ Categorical features: {len(self.cat_cols)}")
         logger.info(f"🎯 Target variable: {target_cols}")
@@ -384,10 +391,11 @@ class PreprocessingFeatures:
                             fuel_types.append(str_lst[i])
 
         logger.info(f"Found {len(fuel_types)} unique fuel types: {fuel_types}")
-
-        fuel_types.remove("natural")
-        fuel_types.remove("gas")
-        fuel_types.append("gas natural")
+        if "natural" in fuel_types:
+            fuel_types.remove("natural")
+        if "gas" in fuel_types:
+            fuel_types.remove("gas")
+            fuel_types.append("gas natural")
 
         self.data["fuel_type"] = self.data["fuel_type"].fillna(
             ""
@@ -435,9 +443,7 @@ class PreprocessingFeatures:
 
         return self
 
-    def _remove_outliers_iqr(
-        self, lower_percentile=0.01, upper_percentile=0.99, k=3
-    ):
+    def _remove_outliers_iqr(self, lower_percentile=0.01, upper_percentile=0.99, k=3):
         """Remove outliers using percentile-based approach"""
 
         columns = self.outlier_columns
@@ -472,13 +478,17 @@ class PreprocessingFeatures:
         return self
 
     def _feature_setup(self):
-
         """Setup features for the transformer."""
         logger.info("Setting up features...")
 
         # Handle missing values
         self.processed_data = self.data.copy()
-        self.input_data = self.processed_data.drop(columns = self.cols_to_drop)
+
+        # Only drop columns that are present in processed_data
+        cols_to_drop_present = [
+            col for col in self.cols_to_drop if col in self.processed_data.columns
+        ]
+        self.input_data = self.processed_data.drop(columns=cols_to_drop_present)
         self.input_columns = self.input_data.columns.tolist()
         self.data = self.input_data.copy()
         logger.info("Feature setup completed successfully")
@@ -502,7 +512,7 @@ class PreprocessingFeaturesTransformer(BaseEstimator, TransformerMixin):
             location_col=self.location_col,
             fuel_type_column=self.fuel_type_column,
             cols_to_drop=self.cols_to_drop,
-            outlier_columns=self.outlier_columns
+            outlier_columns=self.outlier_columns,
         )
 
         self.pre._columns_type()
@@ -514,9 +524,8 @@ class PreprocessingFeaturesTransformer(BaseEstimator, TransformerMixin):
         self.pre._remove_outliers_iqr()
         self.pre._feature_setup()
 
-
         return self.pre.data
-    
+
     def fit_transform(self, X, y=None):
         """
         Fit the transformer and transform the data in one step.

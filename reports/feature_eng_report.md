@@ -162,7 +162,7 @@ Based on domain knowledge and bivariate analysis, removed features with >80% dom
 ## Summary
 The feature engineering pipeline successfully transforms a high-dimensional, mixed-type dataset into a clean, predictive feature set. Key achievements include:
 
-- **35% dimensionality reduction** through intelligent feature selection
+- **35% dimensionality reduction** through intelligent feature selection based on exploratory analysis
 - **Robust categorical encoding** preventing target leakage and overfitting  
 - **Interpretable flag clustering** creating meaningful vehicle feature groups
 - **Production-ready implementation** with sklearn compatibility and serialization
