@@ -1,0 +1,42 @@
+attribute,description
+cd_advertise,ad ID
+cd_client,advertiser ID
+cd_type_individual,advertiser type: Individual=1 Business=2
+priority,ad priority (1=high 2=medium 3=low)
+leads,total number of proposals received
+views,number of ad views
+phone_clicks,number of phone clicks
+cd_vehicle_brand,vehicle brand code
+cd_model_vehicle,vehicle model code
+cd_version_vehicle,vehicle version code
+year_model,vehicle model year
+zip_2dig,first two digits of advertiser ZIP code
+city_state,state and city of advertiser
+vl_advertise,advertised vehicle price
+n_photos,number of photos in the ad
+km_vehicle,vehicle mileage
+vl_market,market reference price of the vehicle
+flg_single_owner,indicator of single ownership
+flg_lincese,indicator that licensing is up to date
+flg_tax_paid,indicator that IPVA tax is paid
+flg_all_dealership_services,indicator that all dealership services were performed
+flg_all_dealership_schedule_vehicle,indicator that all scheduled services were performed
+flg_factory_warranty,indicator that vehicle is under factory warranty
+flg_armored,indicator of armored vehicle
+flg_trade_in,indicator that trade-in is accepted
+flg_pcd,indicator that vehicle is adapted for people with disabilities
+fuel_type,fuel type
+transmission_type,transmission type
+n_doors,number of doors
+flg_alarm,alarm present
+flg_airbag,airbag present
+flg_heater,heater present
+flg_leather_seats,leather seats present
+flg_air_conditioning,air conditioning present
+flg_abs,ABS brakes present
+flg_rear_defogger,rear defogger present
+flg_electric_locks,electric locks present
+flg_electric_windows,electric windows present
+flg_alloy_wheels,alloy wheels present
+flg_rain_sensor,rain sensor present
+flg_parking_sensor,parking sensor present
